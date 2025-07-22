@@ -34,6 +34,8 @@ struct CPU
 };
 
 void reset_cpu(struct CPU * cpu, struct MEMORY * memory);
+void execute_cpu(struct CPU * cpu, DWord cycles, struct MEMORY * memory);
+Byte fetch_instruction_cpu(struct CPU * cpu, DWord * cycles, struct MEMORY * memory);
 void initialize_memory(struct MEMORY * memory);
 
 void reset_cpu(struct CPU * cpu, struct MEMORY * memory)
@@ -60,12 +62,28 @@ void initialize_memory(struct MEMORY * memory)
     }
 }
 
+void execute_cpu(struct CPU * cpu, DWord cycles, struct MEMORY * memory)
+{
+    while(cycles > 0)
+    {
+        Byte instruction = fetch_instruction_cpu(cpu, &cycles, memory);
+    }
+}
+
+Byte fetch_instruction_cpu(struct CPU * cpu, DWord * cycles, struct MEMORY * memory)
+{
+    Byte data = memory->data[cpu->PC];
+    ++(cpu->PC);
+    --(*cycles);
+    return data;
+}
+
 int main()
 {
     struct MEMORY memory;
     struct CPU cpu;
 
     reset_cpu(&cpu, &memory);
-
+    execute_cpu(&cpu, 2, &memory);
     return 0;
 }
