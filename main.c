@@ -7,6 +7,12 @@ typedef __uint32_t DWord;
 
 #define MAX_MEMORY (1024 * 64) 
 
+enum OPCODES
+{
+    __LDA_IM = 0xA9,
+    __LDA_ZP = 0xA5,
+    __LDA_ZPX = 0xB5,
+};
 
 struct MEMORY
 {
@@ -36,7 +42,11 @@ struct CPU
 void reset_cpu(struct CPU * cpu, struct MEMORY * memory);
 void execute_cpu(struct CPU * cpu, DWord cycles, struct MEMORY * memory);
 Byte fetch_instruction_cpu(struct CPU * cpu, DWord * cycles, struct MEMORY * memory);
+Byte read_byte(Byte address, DWord * cycles, struct MEMORY * memory);
+Byte read_word(Word address, DWord * cycles, struct MEMORY * memory);
 void initialize_memory(struct MEMORY * memory);
+
+void setLDAstruction(struct CPU * cpu);
 
 void reset_cpu(struct CPU * cpu, struct MEMORY * memory)
 {
@@ -67,6 +77,36 @@ void execute_cpu(struct CPU * cpu, DWord cycles, struct MEMORY * memory)
     while(cycles > 0)
     {
         Byte instruction = fetch_instruction_cpu(cpu, &cycles, memory);
+        switch(instruction)
+        {
+            case __LDA_IM:
+            {
+                Byte value = fetch_instruction_cpu(cpu, &cycles, memory);
+                cpu->_reg_accumulator = value;
+                setLDAstruction(cpu);
+                break;
+            }
+            case __LDA_ZP:
+            {
+                Byte zero_page_address = fetch_instruction_cpu(cpu, &cycles, memory);
+                cpu->_reg_accumulator = read_byte(zero_page_address, &cycles, memory);
+                setLDAstruction(cpu);
+                break;
+            }
+            case __LDA_ZPX:
+            {
+                Byte zero_page_address = fetch_instruction_cpu(cpu, &cycles, memory);
+                zero_page_address += cpu->_reg_X;
+                --cycles;
+                cpu->_reg_accumulator = read_byte(zero_page_address, &cycles, memory);
+                setLDAstruction(cpu);
+                break;
+            }
+            default:
+            {
+                printf("Instruction not exist %d", instruction);
+            }
+        }
     }
 }
 
@@ -78,12 +118,30 @@ Byte fetch_instruction_cpu(struct CPU * cpu, DWord * cycles, struct MEMORY * mem
     return data;
 }
 
+Byte read_byte(Byte address, DWord * cycles, struct MEMORY * memory)
+{
+    Byte data = memory->data[address];
+    --(*cycles);
+    return data;
+}
+
+void setLDAstruction(struct CPU * cpu)
+{
+    cpu->processor_status._zero = (cpu->_reg_accumulator == 0);
+    cpu->processor_status._negative = (cpu->_reg_accumulator & (1 << 7)) > 0;
+}
+
 int main()
 {
     struct MEMORY memory;
     struct CPU cpu;
 
     reset_cpu(&cpu, &memory);
-    execute_cpu(&cpu, 2, &memory);
+
+    memory.data[0xFFFC] = __LDA_ZP;
+    memory.data[0xFFFD] = 0x42;
+    memory.data[0x0042] = 0x84;
+    
+    execute_cpu(&cpu, 3, &memory);
     return 0;
 }
