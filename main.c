@@ -12,6 +12,7 @@ enum OPCODES
     __LDA_IM = 0xA9,
     __LDA_ZP = 0xA5,
     __LDA_ZPX = 0xB5,
+    __JSR = 0x20,
 };
 
 struct MEMORY
@@ -40,13 +41,18 @@ struct CPU
 };
 
 void reset_cpu(struct CPU * cpu, struct MEMORY * memory);
-void execute_cpu(struct CPU * cpu, DWord cycles, struct MEMORY * memory);
-Byte fetch_instruction_cpu(struct CPU * cpu, DWord * cycles, struct MEMORY * memory);
-Byte read_byte(Byte address, DWord * cycles, struct MEMORY * memory);
-Byte read_word(Word address, DWord * cycles, struct MEMORY * memory);
 void initialize_memory(struct MEMORY * memory);
 
+void execute_cpu(struct CPU * cpu, DWord cycles, struct MEMORY * memory);
+
 void setLDAstruction(struct CPU * cpu);
+
+Byte fetch_instruction_byte_cpu(struct CPU * cpu, DWord * cycles, struct MEMORY * memory);
+Word fetch_instruction_word_cpu(struct CPU * cpu, DWord * cycles, struct MEMORY * memory);
+
+Byte read_byte(Byte address, DWord * cycles, struct MEMORY * memory);
+
+void write_word(Word value, DWord * cycles, DWord address, struct MEMORY * memory);
 
 void reset_cpu(struct CPU * cpu, struct MEMORY * memory)
 {
@@ -76,31 +82,38 @@ void execute_cpu(struct CPU * cpu, DWord cycles, struct MEMORY * memory)
 {
     while(cycles > 0)
     {
-        Byte instruction = fetch_instruction_cpu(cpu, &cycles, memory);
+        Byte instruction = fetch_instruction_byte_cpu(cpu, &cycles, memory);
         switch(instruction)
         {
             case __LDA_IM:
             {
-                Byte value = fetch_instruction_cpu(cpu, &cycles, memory);
+                Byte value = fetch_instruction_byte_cpu(cpu, &cycles, memory);
                 cpu->_reg_accumulator = value;
                 setLDAstruction(cpu);
                 break;
             }
             case __LDA_ZP:
             {
-                Byte zero_page_address = fetch_instruction_cpu(cpu, &cycles, memory);
+                Byte zero_page_address = fetch_instruction_byte_cpu(cpu, &cycles, memory);
                 cpu->_reg_accumulator = read_byte(zero_page_address, &cycles, memory);
                 setLDAstruction(cpu);
                 break;
             }
             case __LDA_ZPX:
             {
-                Byte zero_page_address = fetch_instruction_cpu(cpu, &cycles, memory);
+                Byte zero_page_address = fetch_instruction_byte_cpu(cpu, &cycles, memory);
                 zero_page_address += cpu->_reg_X;
                 --cycles;
                 cpu->_reg_accumulator = read_byte(zero_page_address, &cycles, memory);
                 setLDAstruction(cpu);
                 break;
+            }
+            case __JSR:
+            {
+                Word subroutine_address = fetch_instruction_word_cpu(cpu, &cycles, memory);
+                write_word(cpu->PC - 1, cycles, cpu->SP, memory);
+                cpu->PC = subroutine_address;
+                --cycles;
             }
             default:
             {
@@ -110,11 +123,21 @@ void execute_cpu(struct CPU * cpu, DWord cycles, struct MEMORY * memory)
     }
 }
 
-Byte fetch_instruction_cpu(struct CPU * cpu, DWord * cycles, struct MEMORY * memory)
+Byte fetch_instruction_byte_cpu(struct CPU * cpu, DWord * cycles, struct MEMORY * memory)
 {
     Byte data = memory->data[cpu->PC];
     ++(cpu->PC);
     --(*cycles);
+    return data;
+}
+
+Word fetch_instruction_word_cpu(struct CPU * cpu, DWord * cycles, struct MEMORY * memory)
+{
+    Word data = memory->data[cpu->PC];
+    ++(cpu->PC);
+    data |= (memory->data[cpu->PC] << 8);
+    ++(cpu->PC);
+    (*cycles) -= 2;
     return data;
 }
 
@@ -123,6 +146,13 @@ Byte read_byte(Byte address, DWord * cycles, struct MEMORY * memory)
     Byte data = memory->data[address];
     --(*cycles);
     return data;
+}
+
+void write_word(Word value, DWord * cycles, DWord address, struct MEMORY * memory)
+{
+    memory->data[address] = value && 0xFF;
+    memory->data[address + 1] = (value >> 8); // why is 8 to right?
+    cycles -= 2;
 }
 
 void setLDAstruction(struct CPU * cpu)
@@ -138,10 +168,12 @@ int main()
 
     reset_cpu(&cpu, &memory);
 
-    memory.data[0xFFFC] = __LDA_ZP;
+    memory.data[0xFFFC] = __JSR;
     memory.data[0xFFFD] = 0x42;
-    memory.data[0x0042] = 0x84;
+    memory.data[0xFFFE] = 0x42;
+    memory.data[0x4242] = __LDA_IM;
+    memory.data[0x4243] = 0x84;
     
-    execute_cpu(&cpu, 3, &memory);
+    execute_cpu(&cpu, 9, &memory);
     return 0;
 }
