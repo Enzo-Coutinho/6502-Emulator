@@ -1,4 +1,5 @@
 #include "cpu.h"
+#include <stdio.h>
 
 void reset_cpu(struct CPU * cpu, struct MEMORY * memory)
 {
@@ -57,7 +58,7 @@ void execute_cpu(struct CPU * cpu, DWord cycles, struct MEMORY * memory)
             case __JSR:
             {
                 Word subroutine_address = fetch_instruction_word_cpu(cpu, &cycles, memory);
-                write_word(cpu->PC - 1, cycles, cpu->SP, memory);
+                write_word(cpu->PC - 1, &cycles, cpu->SP, memory);
                 cpu->PC = subroutine_address;
                 --cycles;
             }

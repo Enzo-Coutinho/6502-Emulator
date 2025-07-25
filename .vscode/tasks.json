@@ -8,6 +8,9 @@
                 "-fdiagnostics-color=always",
                 "-g",
                 "${file}",
+                "instructions.h",
+                "cpu.h",
+                "cpu.c",
                 "-o",
                 "${fileDirname}/${fileBasenameNoExtension}"
             ],
